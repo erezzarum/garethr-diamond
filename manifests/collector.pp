@@ -10,17 +10,25 @@
 #   Some collectors have multiple sections, for example the netapp and rabbitmq collectors
 #   Each section can have its own options
 define diamond::collector (
-  $options = undef,
+  $enabled  = true,
+  $options  = undef,
   $sections = undef
 ) {
   include diamond
 
-  Class['diamond::config']
-  ->
-  file {"/etc/diamond/collectors/${name}.conf":
-    content => template('diamond/etc/diamond/collectors/collector.conf.erb')
+  $_enabled = $enabled ? {
+    false   => 'False',
+    default => 'True',
   }
-  ~>
-  Class['diamond::service']
+  $_notify = $::diamond::restart_collectors ? {
+    true    => Class['::diamond::service'],
+    default => undef,
+  }
+
+  file { "/etc/diamond/collectors/${name}.conf":
+    content => template('diamond/etc/diamond/collectors/collector.conf.erb'),
+    require => Class['::diamond::config'],
+    notify  => $_notify,
+  }
 }
 

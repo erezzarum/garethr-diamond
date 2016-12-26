@@ -10,16 +10,19 @@
 #   Some handlers have multiple sections,
 #   Each section can have its own options
 define diamond::handler (
-  $options = undef,
+  $options  = undef,
   $sections = undef
 ) {
   include diamond
 
-  Class['diamond::config']
-  ->
-  file {"/etc/diamond/handlers/${name}.conf":
-    content => template('diamond/etc/diamond/handlers/handler.conf.erb')
+  $_notify = $::diamond::restart_handlers ? {
+    true    => Class['::diamond::service'],
+    default => undef,
   }
-  ~>
-  Class['diamond::service']
+
+  file { "/etc/diamond/handlers/${name}.conf":
+    content => template('diamond/etc/diamond/handlers/handler.conf.erb'),
+    require => Class['::diamond::config'],
+    notify  => $_notify,
+  }
 }

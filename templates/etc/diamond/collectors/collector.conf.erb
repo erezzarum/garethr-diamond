@@ -1,4 +1,4 @@
-enabled=True
+enabled=<%= @_enabled %>
 <% if defined?(@options)
      @options.keys.sort.each do |k| -%>
 <%= "#{k} = #{@options[k]}" %>

@@ -1,19 +1,3 @@
-<%-
-handlers = Array(scope.lookupvar('diamond::extra_handlers'))
-
-if scope.lookupvar('diamond::graphite_host') then
-  handlers << "diamond.handler.#{scope.lookupvar('diamond::graphite_handler')}"
-end
-if scope.lookupvar('diamond::archive') then
-  handlers << "diamond.handler.#{scope.lookupvar('diamond::archive_handler')}"
-end
-if scope.lookupvar('diamond::librato_user') and scope.lookupvar('diamond::librato_apikey') then
-  handlers << 'diamond.handler.libratohandler.LibratoHandler'
-end
-if scope.lookupvar('diamond::riemann_host') then
-  handlers << 'diamond.handler.riemann.RiemannHandler'
-end
--%>
 ################################################################################
 # Diamond Configuration File
 ################################################################################
@@ -23,7 +7,7 @@ end
 [server]
 
 # Handlers for published metrics.
-handlers = <%= Array(handlers).join(',') %>
+handlers = diamond.handler.graphite.GraphiteHandler, diamond.handler.archive.ArchiveHandler
 
 # User diamond will run as
 # Leave empty to use the current user
@@ -42,29 +26,20 @@ collectors_path = /usr/share/diamond/collectors/
 # Directory to load collector configs from
 collectors_config_path = /etc/diamond/collectors/
 
-<% if scope.lookupvar('diamond::collectors_load_delay') -%>
 # Number of seconds between each collector load
-collectors_load_delay = <%= scope.lookupvar('diamond::collectors_load_delay') %>
+# collectors_load_delay = 1.0
 
-<% end -%>
 # Directory to load handler configs from
 handlers_config_path = /etc/diamond/handlers/
 
-<% if scope.lookupvar('diamond::handlers_path') -%>
-handlers_path = <%= scope.lookupvar('diamond::handlers_path') %>
+# Directory to load handler modules from
+handlers_path = /usr/share/diamond/handlers/
 
-<% end -%>
-<% if scope.lookupvar('diamond::metric_queue_size') -%>
 # Maximum number of metrics waiting to be processed by handlers.
 # When metric queue is full, new metrics are dropped.
-metric_queue_size = <%= scope.lookupvar('diamond::metric_queue_size') %>
+metric_queue_size = 16384
 
-<% end -%>
-<% if scope.lookupvar('diamond::collectors_reload_interval') -%>
-# Interval to reload collectors
-collectors_reload_interval = <%= scope.lookupvar('diamond::collectors_reload_interval') %>
 
-<% end -%>
 ################################################################################
 ### Options for handlers
 [handlers]
@@ -78,53 +53,40 @@ keys = rotated_file
 [[ArchiveHandler]]
 
 # File to write archive log files
-log_file = <%= scope.lookupvar('diamond::archive_log') %>
+log_file = /var/log/diamond/archive.log
 
 # Number of days to keep archive log files
-days = <%= scope.lookupvar('diamond::archive_days') %>
+days = 7
 
 [[GraphiteHandler]]
 ### Options for GraphiteHandler
 
 # Graphite server host
-<% if scope.lookupvar('diamond::graphite_host') -%>
-host = <%= scope.lookupvar('diamond::graphite_host') %>
-<% else -%>
 host = 127.0.0.1
-<% end -%>
 
 # Port to send metrics to
-port = <%= scope.lookupvar('diamond::graphite_port') %>
-
-<% if scope.lookupvar('diamond::graphite_protocol') -%>
-# Protocol to use to send
-proto = <%= scope.lookupvar('diamond::graphite_protocol') %>
-<% end -%>
+port = 2003
 
 # Socket timeout (seconds)
-timeout = <%= scope.lookupvar('diamond::graphite_timeout') %>
+timeout = 15
 
 # Batch size for metrics
-batch = <%= scope.lookupvar('diamond::graphite_batchsize') %>
+batch = 1
 
 [[GraphitePickleHandler]]
 ### Options for GraphitePickleHandler
 
 # Graphite server host
-<% if scope.lookupvar('diamond::graphite_host') -%>
-host = <%= scope.lookupvar('diamond::graphite_host') %>
-<% else -%>
 host = 127.0.0.1
-<% end -%>
 
 # Port to send metrics to
-port = <%= scope.lookupvar('diamond::graphite_pickle_port') %>
+port = 2004
 
 # Socket timeout (seconds)
-timeout = <%= scope.lookupvar('diamond::graphite_timeout') %>
+timeout = 15
 
 # Batch size for pickled metrics
-batch = <%= scope.lookupvar('diamond::graphite_batchsize') %>
+batch = 256
 
 [[MySQLHandler]]
 ### Options for MySQLHandler
@@ -144,8 +106,8 @@ col_metric  = metric
 col_value   = value
 
 [[StatsdHandler]]
-host = <%= scope.lookupvar('diamond::stats_host') %>
-port = <%= scope.lookupvar('diamond::stats_port') %>
+host = 127.0.0.1
+port = 8125
 
 [[TSDBHandler]]
 host = 127.0.0.1
@@ -153,13 +115,26 @@ port = 4242
 timeout = 15
 
 [[LibratoHandler]]
-user = <%= @librato_user %>
-apikey = <%= @librato_apikey %>
+user = user@example.com
+apikey = abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz01
 
-[[RiemannHandler]]
-host = <%= @riemann_host %>
-port = 5555
-transport = tcp
+[[HostedGraphiteHandler]]
+apikey = abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz01
+timeout = 15
+batch = 1
+
+[[SignalfxHandler]]
+auth_token = abcdefghijklmnopqrstuvwxyz
+
+# And any other config settings from GraphiteHandler are valid here
+
+[[HttpPostHandler]]
+
+### Urp to post the metrics
+url = http://localhost:8888/
+### Metrics batch size
+batch = 100
+
 
 ################################################################################
 ### Options for collectors
@@ -171,10 +146,6 @@ transport = tcp
 # Uncomment and set to hardcode a hostname for the collector path
 # Keep in mind, periods are seperators in graphite
 # hostname = my_custom_hostname
-
-<% if scope.lookupvar('diamond::server_hostname') -%>
-hostname = <%= scope.lookupvar('diamond::server_hostname') %>
-<% end -%>
 
 # If you prefer to just use a different way of calculating the hostname
 # Uncomment and set this to one of these values:
@@ -192,30 +163,27 @@ hostname = <%= scope.lookupvar('diamond::server_hostname') %>
 # hostname          = `hostname`
 # hostname_rev      = `hostname` in reverse (com.example.www)
 
+# shell             = Run the string set in hostname as a shell command and use its
+#                     output(with spaces trimmed off from both ends) as the hostname.
+
 # hostname_method = smart
-<% if scope.lookupvar('diamond::hostname_method') -%>
-hostname_method = <%= scope.lookupvar('diamond::hostname_method') %>
-<% end -%>
 
 # Path Prefix and Suffix
 # you can use one or both to craft the path where you want to put metrics
 # such as: %(path_prefix)s.$(hostname)s.$(path_suffix)s.$(metric)s
 # path_prefix = servers
-<% if scope.lookupvar('diamond::path_prefix') -%>
-path_prefix = <%= scope.lookupvar('diamond::path_prefix') %>
-<% end -%>
 # path_suffix =
-<% if scope.lookupvar('diamond::path_suffix') -%>
-path_suffix = <%= scope.lookupvar('diamond::path_suffix') %>
-<% end -%>
-<% if scope.lookupvar('diamond::instance_prefix') -%>
-instance_prefix = <%= scope.lookupvar('diamond::instance_prefix') %>
-<% end -%>
+
+# Path Prefix for Virtual Machines
+# If the host supports virtual machines, collectors may report per
+# VM metrics. Following OpenStack nomenclature, the prefix for
+# reporting per VM metrics is "instances", and metric foo for VM
+# bar will be reported as: instances.bar.foo...
+# instance_prefix = instances
 
 # Default Poll Interval (seconds)
-interval = <%= scope.lookupvar('diamond::interval') %>
+# interval = 300
 
-<% if scope.lookupvar('diamond::default_collectors') -%>
 ################################################################################
 # Default enabled collectors
 ################################################################################
@@ -238,7 +206,6 @@ enabled = True
 [[VMStatCollector]]
 enabled = True
 
-<% end -%>
 ################################################################################
 ### Options for logging
 # for more information on file format syntax:
@@ -259,19 +226,33 @@ keys = default
 [logger_root]
 
 # to increase verbosity, set DEBUG
-level = <%= scope.lookupvar('diamond::logger_level') %>
+level = INFO
 handlers = rotated_file
 propagate = 1
 
 [handler_rotated_file]
 
 class = handlers.TimedRotatingFileHandler
-level = <%= scope.lookupvar('diamond::rotate_level') %>
+level = DEBUG
 formatter = default
-# rotate at midnight, each day and keep <%= scope.lookupvar('diamond::rotate_days') %> days
-args = ('/var/log/diamond/diamond.log', 'midnight', 1, <%= scope.lookupvar('diamond::rotate_days') %>)
+# rotate at midnight, each day and keep 7 days
+args = ('/var/log/diamond/diamond.log', 'midnight', 1, 7)
 
 [formatter_default]
 
 format = [%(asctime)s] [%(threadName)s] %(message)s
 datefmt =
+
+################################################################################
+### Options for config merging
+# [configs]
+# path = "/etc/diamond/configs/"
+# extension = ".conf"
+#-------------------------------------------------------------------------------
+# Example:
+# /etc/diamond/configs/net.conf
+# [collectors]
+#
+# [[NetworkCollector]]
+# enabled = True
+

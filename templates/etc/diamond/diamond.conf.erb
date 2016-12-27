@@ -68,7 +68,6 @@ collectors_reload_interval = <%= scope.lookupvar('diamond::collectors_reload_int
 ################################################################################
 ### Options for handlers
 [handlers]
-
 # daemon logging handler(s)
 keys = rotated_file
 
@@ -245,7 +244,6 @@ enabled = True
 # http://docs.python.org/library/logging.config.html#configuration-file-format
 
 [loggers]
-
 keys = root
 
 # handlers are higher in this config file, in:
@@ -253,18 +251,15 @@ keys = root
 # keys = ...
 
 [formatters]
-
 keys = default
 
 [logger_root]
-
 # to increase verbosity, set DEBUG
 level = <%= scope.lookupvar('diamond::logger_level') %>
 handlers = rotated_file
 propagate = 1
 
 [handler_rotated_file]
-
 class = handlers.TimedRotatingFileHandler
 level = <%= scope.lookupvar('diamond::rotate_level') %>
 formatter = default
@@ -272,6 +267,5 @@ formatter = default
 args = ('/var/log/diamond/diamond.log', 'midnight', 1, <%= scope.lookupvar('diamond::rotate_days') %>)
 
 [formatter_default]
-
 format = [%(asctime)s] [%(threadName)s] %(message)s
 datefmt =
